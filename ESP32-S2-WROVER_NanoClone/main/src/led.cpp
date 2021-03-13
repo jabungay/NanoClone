@@ -1,22 +1,14 @@
 #include "driver/rmt.h"
 #include "led.h"
 
-#define LED_PIN GPIO_NUM_18
-#define LED_RMT_CH RMT_CHANNEL_0
-
-#define NUM_LEDS 1
-
-// Timing requirements for RGB LED
-#define WS2812_T0H_NS (350)
-#define WS2812_T0L_NS (1000)
-#define WS2812_T1H_NS (1000)
-#define WS2812_T1L_NS (350)
-#define WS2812_RESET_US (280)
 static uint32_t ws2812_t0h_ticks = 0;
 static uint32_t ws2812_t1h_ticks = 0;
 static uint32_t ws2812_t0l_ticks = 0;
 static uint32_t ws2812_t1l_ticks = 0;
 
+
+
+// Convert data to RMT format (from example code)
 static void IRAM_ATTR vToRmtFormat(const void *src, rmt_item32_t *dest, size_t src_size,
         size_t wanted_num, size_t *translated_size, size_t *item_num)
 {
@@ -49,13 +41,24 @@ static void IRAM_ATTR vToRmtFormat(const void *src, rmt_item32_t *dest, size_t s
     *item_num = num;
 }
 
-void vSetPixel(uint8_t r, uint8_t g, uint8_t b)
+SRGB psRGB[NUM_LEDS];    // Array of LEDs
+
+// Set the value of a pixel in the array
+// This does not update the actual LEDs, just the array
+void vSetPixel(uint8_t index, SRGB *psRGB, SRGB rgb)
 {
-    uint8_t buf[] = { g, r, b };
-    rmt_write_sample(LED_RMT_CH, buf, 3, true);
-    rmt_wait_tx_done(LED_RMT_CH, pdMS_TO_TICKS(1000));
+    if (index >= NUM_LEDS) { return; }
+    psRGB[index] = rgb;
 }
 
+// Update all LEDs to an array of SRGB values whose length is equal to the number of LEDs
+void vUpdateLEDs(SRGB psRGB[NUM_LEDS])
+{
+    rmt_write_sample(LED_RMT_CH, (uint8_t*) psRGB, NUM_LEDS * 3, true); // Queue the sending of the RGB colour data (NUM_LEDS * 3 for R,G,B)
+    rmt_wait_tx_done(LED_RMT_CH, pdMS_TO_TICKS(1000));                  // Wait for the Tx to complete
+}
+
+// Initialize the RGB strip and the rmt peripheral
 void vStripInit(void)
 {
     rmt_config_t rConfig = RMT_DEFAULT_CONFIG_TX(LED_PIN, LED_RMT_CH);
@@ -83,7 +86,17 @@ void vTaskLED(void * pvParams)
     {
         for (uint8_t i = 0; i < 255; i++)
         {
-            vSetPixel(i,255-i,0);
+            SRGB c;
+            c.r = i;
+            c.g = 255-i;
+            c.b = 0;
+
+            for (uint8_t i = 0; i < NUM_LEDS; i++)
+            {
+                vSetPixel(i, psRGB, c);    
+            }
+            vUpdateLEDs(psRGB);
+
             vTaskDelay(pdMS_TO_TICKS(10));
         }  
     }
