@@ -21,7 +21,8 @@
     "esp_spi_flash.h": "c",
     "timer.h": "c",
     "*.ipp": "cpp",
-    "random": "cpp"
+    "random": "cpp",
+    "ratio": "cpp"
   },
   "git.ignoreLimitWarning": true
 }

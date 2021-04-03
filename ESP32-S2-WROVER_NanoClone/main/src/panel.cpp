@@ -45,31 +45,36 @@ void Tile::vTasks(uint32_t uTimeDelta)
 }
 
 Nanoclone::Nanoclone() { }
-Nanoclone::Nanoclone(uint8_t uNumTiles, uint8_t uLedsPerTile, TaskFunction_t xTask)
+Nanoclone::Nanoclone(uint8_t uNumTiles, uint8_t uLedsPerTile)
 {
     // Set Class Variables
-    this->_xTask        = xTask;
     this->_uNumTiles    = uNumTiles;
     this->_uLedsPerTile = uLedsPerTile;
-    this->_xHandle      = NULL;
     this->_uBrightness  = 0xFF;
 
     this->_psRGB = new SRGB[uNumTiles * uLedsPerTile]; // Allocate SRGB array
+    memset(this->_psRGB, 0, uNumTiles * uLedsPerTile * 3);  // Ensure array is clear
+
+    this->_ptLedStrip = new AddrRGB(LED_PIN, LED_RMT_CH, uNumTiles * uLedsPerTile);
 
     this->_poTile = new Tile[uNumTiles];    // Allocate Tile array
     for (uint8_t i = 0; i < uNumTiles; i++) // Initialize Tile array
     {
         this->_poTile[i] = Tile(this, i, (this->_psRGB + i*uLedsPerTile), uLedsPerTile);
     }
-    
-    xTaskCreate(this->_xTask, "TaskLED", 2048, &this->_ucParam, tskIDLE_PRIORITY, &this->_xHandle); // Register the RTOS task
 }
 
 Nanoclone::~Nanoclone()
 {
     delete[] this->_psRGB;
     delete[] this->_poTile;
+    delete this->_ptLedStrip;
     // vTaskDelete(this->_xHandle);
+}
+
+void Nanoclone::vInit(void)
+{
+    this->_ptLedStrip->vInit();
 }
 
 // Set the colour of Tile i immediateley
@@ -78,7 +83,12 @@ Nanoclone::~Nanoclone()
 void Nanoclone::vSetColour(uint8_t i, SRGB rgb)
 {
     this->_poTile[i].vSetColour(rgb);   // Call on the Tile to update its own data
-    vUpdateLEDs(this->_psRGB);          // Push updated colours to LEDs
+    this->_ptLedStrip->vUpdateLEDs(this->_psRGB);          // Push updated colours to LEDs
+}
+
+void Nanoclone::vQueueColour(uint8_t i, SRGB rgb)
+{
+    
 }
 
 void Nanoclone::vSetBrightness(uint8_t uBrightness)
@@ -102,7 +112,7 @@ void Nanoclone::vSetBrightness(uint8_t uBrightness)
         psRGB_Scaled[i].b = (uint8_t) dB;
     }
 
-    vUpdateLEDs(psRGB_Scaled);  // Push the scaled colours to the panel
+    this->_ptLedStrip->vUpdateLEDs(psRGB_Scaled);  // Push the scaled colours to the panel
 }
 
 // Execute any pending tasks for the Nanoclone
@@ -117,6 +127,7 @@ void Nanoclone::vTasks(uint32_t uTimeDelta)
     }
 
     uint32_t uNumLeds = this->_uNumTiles * this->_uLedsPerTile;
+
     SRGB psRGB_Scaled[uNumLeds];
 
     for(uint8_t i = 0; i < uNumLeds; i++)   // Scale all colours based on brightness value
@@ -134,7 +145,7 @@ void Nanoclone::vTasks(uint32_t uTimeDelta)
         psRGB_Scaled[i].b = (uint8_t) dB;
     }
 
-    vUpdateLEDs(psRGB_Scaled);  // Push the scaled colours to the panel
+    this->_ptLedStrip->vUpdateLEDs(psRGB_Scaled);  // Push the scaled colours to the panel
 
     // vUpdateLEDs(this->_psRGB); // Refresh the panel
 }

@@ -1,4 +1,4 @@
-#include "driver/rmt.h"
+
 #include "led.h"
 
 static uint32_t ws2812_t0h_ticks = 0;
@@ -39,63 +39,82 @@ static void IRAM_ATTR vToRmtFormat(const void *src, rmt_item32_t *dest, size_t s
     *item_num = num;
 }
 
-SRGB psRGB[NUM_LEDS];    // Array of LEDs
+// SRGB psRGB[NUM_LEDS];    // Array of LEDs
 
-// Set the value of a pixel in the array
-// This does not update the actual LEDs, just the array
-void vSetPixel(uint8_t index, SRGB *psRGB, SRGB rgb)
+// // Set the value of a pixel in the array
+// // This does not update the actual LEDs, just the array
+// void vSetPixel(uint8_t index, SRGB *psRGB, SRGB rgb)
+// {
+//     if (index >= NUM_LEDS) { return; }
+//     psRGB[index] = rgb;
+// }
+
+// // Update all LEDs to an array of SRGB values whose length is equal to the number of LEDs
+// void vUpdateLEDs(SRGB psRGB[NUM_LEDS])
+// {
+//     rmt_write_sample(LED_RMT_CH, (uint8_t*) psRGB, NUM_LEDS * 3, true); // Queue the sending of the RGB colour data (NUM_LEDS * 3 for R,G,B)
+//     rmt_wait_tx_done(LED_RMT_CH, pdMS_TO_TICKS(1000));                  // Wait for the Tx to complete
+// }
+
+// // Initialize the RGB strip and the rmt peripheral
+// void vStripInit(void)
+// {
+//     rmt_config_t rConfig = RMT_DEFAULT_CONFIG_TX(LED_PIN, LED_RMT_CH);
+//     rConfig.clk_div = 2;
+
+//     rmt_config(&rConfig);
+//     rmt_driver_install(rConfig.channel, 0, 0);
+
+//     uint32_t counter_clk_hz = 0;
+//     rmt_get_counter_clock(LED_RMT_CH, &counter_clk_hz);
+
+//     // ns -> ticks
+//     float ratio = (float)counter_clk_hz / 1e9;
+//     ws2812_t0h_ticks = (uint32_t)(ratio * WS2812_T0H_NS);
+//     ws2812_t0l_ticks = (uint32_t)(ratio * WS2812_T0L_NS);
+//     ws2812_t1h_ticks = (uint32_t)(ratio * WS2812_T1H_NS);
+//     ws2812_t1l_ticks = (uint32_t)(ratio * WS2812_T1L_NS);
+
+//     rmt_translator_init(LED_RMT_CH, vToRmtFormat);
+// }
+
+AddrRGB::AddrRGB(gpio_num_t gpio, rmt_channel_t channel, uint32_t uNumLeds)
 {
-    if (index >= NUM_LEDS) { return; }
-    psRGB[index] = rgb;
+    rmt_config_t hConfig = RMT_DEFAULT_CONFIG_TX(gpio, channel);
+    _hConfig = hConfig;
+    _hConfig.clk_div = 2;
+
+    // _psRGB = psRGB;
+    _uNumLeds = uNumLeds;
 }
 
-// Update all LEDs to an array of SRGB values whose length is equal to the number of LEDs
-void vUpdateLEDs(SRGB psRGB[NUM_LEDS])
+void AddrRGB::vInit(void)
 {
-    rmt_write_sample(LED_RMT_CH, (uint8_t*) psRGB, NUM_LEDS * 3, true); // Queue the sending of the RGB colour data (NUM_LEDS * 3 for R,G,B)
-    rmt_wait_tx_done(LED_RMT_CH, pdMS_TO_TICKS(1000));                  // Wait for the Tx to complete
-}
-
-// Initialize the RGB strip and the rmt peripheral
-void vStripInit(void)
-{
-    rmt_config_t rConfig = RMT_DEFAULT_CONFIG_TX(LED_PIN, LED_RMT_CH);
-    rConfig.clk_div = 2;
-
-    rmt_config(&rConfig);
-    rmt_driver_install(rConfig.channel, 0, 0);
+    rmt_config(&_hConfig);
+    rmt_driver_install(_hConfig.channel, 0, 0);
 
     uint32_t counter_clk_hz = 0;
-    rmt_get_counter_clock(LED_RMT_CH, &counter_clk_hz);
+    rmt_get_counter_clock(_hConfig.channel, &counter_clk_hz);
 
-    // ns -> ticks
-    float ratio = (float)counter_clk_hz / 1e9;
+    // Scale Factor for ns->ticks
+    float ratio  = (float)counter_clk_hz / 1e9;
     ws2812_t0h_ticks = (uint32_t)(ratio * WS2812_T0H_NS);
     ws2812_t0l_ticks = (uint32_t)(ratio * WS2812_T0L_NS);
     ws2812_t1h_ticks = (uint32_t)(ratio * WS2812_T1H_NS);
-    ws2812_t1l_ticks = (uint32_t)(ratio * WS2812_T1L_NS);
+    ws2812_t1l_ticks = (uint32_t)(ratio * WS2812_T1L_NS); 
 
-    rmt_translator_init(LED_RMT_CH, vToRmtFormat);
+    rmt_translator_init(_hConfig.channel, vToRmtFormat);
 }
 
-// void xTaskLED(void * pvParams)
-// {
-//     for (;;)
-//     {
-//         for (uint8_t i = 0; i < 255; i++)
-//         {
-//             SRGB c;
-//             c.r = i;
-//             c.g = 255-i;
-//             c.b = 0;
+void AddrRGB::vSetPixel(uint32_t uIndex, SRGB* psRGB, SRGB rgb)
+{
+    if (uIndex >= _uNumLeds) { return; } // Guard against overflow
+    psRGB[uIndex] = rgb;
+}
 
-//             for (uint8_t i = 0; i < NUM_LEDS; i++)
-//             {
-//                 vSetPixel(i, psRGB, c);    
-//             }
-//             vUpdateLEDs(psRGB);
-
-//             vTaskDelay(pdMS_TO_TICKS(10));
-//         }  
-//     }
-// }
+void AddrRGB::vUpdateLEDs(SRGB *psRGB)
+{
+    // Queue the sending of the RGB colour data (NUM_LEDS * 3 for R,G,B)
+    rmt_write_sample(_hConfig.channel, (uint8_t*) psRGB, this->_uNumLeds * 3, true); 
+    rmt_wait_tx_done(_hConfig.channel, pdMS_TO_TICKS(1000)); // Wait for the Tx to complete (Very quick)
+}

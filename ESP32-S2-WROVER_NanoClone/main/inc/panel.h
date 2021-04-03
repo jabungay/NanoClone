@@ -2,6 +2,11 @@
 
 #define TRANSITION_TIME_MS 100 // How long should a colour tranisiton take?
 
+#define LED_PIN    (GPIO_NUM_11)
+#define LED_RMT_CH (RMT_CHANNEL_0)
+
+
+
 class Nanoclone; 
 
 class Tile
@@ -19,8 +24,8 @@ public:
 private:
     Nanoclone* _poParent; // Pointer to the parent Nanoclone
 
-    uint8_t _uIndex; // My index in the panel array
-    uint8_t _uLedsPerTile;
+    uint32_t _uIndex; // My index in the panel array
+    uint32_t _uLedsPerTile;
     SRGB*   _psRGB;  // Pointer to my RGB values in the array
 
     // Variables for colour changing
@@ -36,8 +41,10 @@ class Nanoclone
 {
 public:
     Nanoclone();
-    Nanoclone(uint8_t uNumPanels, uint8_t uLedsPerPanel, TaskFunction_t xTask);
+    Nanoclone(uint8_t uNumPanels, uint8_t uLedsPerPanel);
     ~Nanoclone();
+
+    void vInit(void);
 
     void vQueueColour(uint8_t i, SRGB rgb); // Queue a colour change for tile i
     void vSetColour(uint8_t i, SRGB rgb);
@@ -48,15 +55,17 @@ public:
 private:
     Tile* _poTile;  // Array of attached tiles
 
+    AddrRGB* _ptLedStrip;
+
     SRGB* _psRGB;
 
-    uint8_t _uNumTiles;
-    uint8_t _uLedsPerTile;
+    uint32_t _uNumTiles;
+    uint32_t _uLedsPerTile;
 
     uint8_t _uBrightness;
 
     // FreeRTOS Variables
-    TaskFunction_t _xTask; // Pointer to task function
-    TaskHandle_t _xHandle; // Task handler
-    uint8_t _ucParam;
+    // TaskFunction_t _xTask; // Pointer to task function
+    // TaskHandle_t _xHandle; // Task handler
+    // uint8_t _ucParam;
 };
