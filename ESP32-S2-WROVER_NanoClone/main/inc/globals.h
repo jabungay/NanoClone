@@ -8,3 +8,5 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 
+extern uint64_t uTimeMsec;
+

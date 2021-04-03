@@ -6,8 +6,6 @@ static uint32_t ws2812_t1h_ticks = 0;
 static uint32_t ws2812_t0l_ticks = 0;
 static uint32_t ws2812_t1l_ticks = 0;
 
-
-
 // Convert data to RMT format (from example code)
 static void IRAM_ATTR vToRmtFormat(const void *src, rmt_item32_t *dest, size_t src_size,
         size_t wanted_num, size_t *translated_size, size_t *item_num)
@@ -80,24 +78,24 @@ void vStripInit(void)
     rmt_translator_init(LED_RMT_CH, vToRmtFormat);
 }
 
-void vTaskLED(void * pvParams)
-{
-    for (;;)
-    {
-        for (uint8_t i = 0; i < 255; i++)
-        {
-            SRGB c;
-            c.r = i;
-            c.g = 255-i;
-            c.b = 0;
+// void xTaskLED(void * pvParams)
+// {
+//     for (;;)
+//     {
+//         for (uint8_t i = 0; i < 255; i++)
+//         {
+//             SRGB c;
+//             c.r = i;
+//             c.g = 255-i;
+//             c.b = 0;
 
-            for (uint8_t i = 0; i < NUM_LEDS; i++)
-            {
-                vSetPixel(i, psRGB, c);    
-            }
-            vUpdateLEDs(psRGB);
+//             for (uint8_t i = 0; i < NUM_LEDS; i++)
+//             {
+//                 vSetPixel(i, psRGB, c);    
+//             }
+//             vUpdateLEDs(psRGB);
 
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }  
-    }
-}
+//             vTaskDelay(pdMS_TO_TICKS(10));
+//         }  
+//     }
+// }
